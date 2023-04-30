@@ -1,5 +1,5 @@
 '''
-rohith chowdaryrohith chowaryAkond Rahman 
+Rohith chowdary  
 May 03, 2021 
 Code to detect security anti-patterns 
 '''
