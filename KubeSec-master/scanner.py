@@ -1,5 +1,5 @@
 '''
-Rohith chowdary  
+Akond Rahman 
 May 03, 2021 
 Code to detect security anti-patterns 
 '''
@@ -10,63 +10,76 @@ import os
 import pandas as pd 
 import numpy as np 
 
-def getYAMLFiles(path_to_dir):
-    valid_  = [] 
-    for root_, dirs, files_ in os.walk( path_to_dir ):
-       for file_ in files_:
-           full_p_file = os.path.join(root_, file_)
-           if(os.path.exists(full_p_file)):
-             if (full_p_file.endswith( constants.YML_EXTENSION  )  or full_p_file.endswith( constants.YAML_EXTENSION  )  ):
-               valid_.append(full_p_file)
-    return valid_ 
+import logging
+import os
+from typing import List
 
-def isValidUserName(uName): 
-    valid = True
-    if (isinstance( uName , str)  ): 
-        if( any(z_ in uName for z_ in constants.FORBIDDEN_USER_NAMES )   ): 
-            valid = False   
-        else: 
-            valid = True    
-    else: 
-        valid = False   
-    return valid
+import constants
 
-def isValidPasswordName(pName): 
-    valid = True
-    if (isinstance( pName , str)  ): 
-        if( any(z_ in pName for z_ in constants.FORBIDDEN_PASS_NAMES) )  : 
-            valid = False  
-        else: 
-            valid = True    
-    else: 
-        valid = False               
-    return valid
 
-def isValidKey(keyName): 
-    valid = False 
-    if ( isinstance( keyName, str )  ):
-        if( any(z_ in keyName for z_ in constants.LEGIT_KEY_NAMES ) ) : 
-            valid = True   
-        else: 
-            valid = False     
-    else: 
-        valid = False                      
-    return valid    
+logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
-def checkIfValidSecret(single_config_val):
-    flag2Ret = False 
-    # print(type( single_config_val ), single_config_val  )
-    if ( isinstance( single_config_val, str ) ):
-        single_config_val = single_config_val.lower()
-        config_val = single_config_val.strip() 
-        if ( any(x_ in config_val for x_ in constants.INVALID_SECRET_CONFIG_VALUES ) ):
-            flag2Ret = False 
-        else:
-            if(  len(config_val) > 2 )  :
-                flag2Ret = True 
-    else: 
-        flag2Ret = False 
-    return flag2Ret
+
+def get_yaml_files(path_to_dir: str) -> List[str]:
+    """Returns a list of valid YAML files found in the given directory and its subdirectories."""
+    valid_files = []
+    for root_, dirs, files_ in os.walk(path_to_dir):
+        for file_ in files_:
+            full_p_file = os.path.join(root_, file_)
+            if os.path.exists(full_p_file) and (full_p_file.endswith(constants.YML_EXTENSION) or full_p_file.endswith(constants.YAML_EXTENSION)):
+                valid_files.append(full_p_file)
+                logging.info(f"Found valid YAML file: {full_p_file}")
+    return valid_files
+
+
+def is_valid_username(username: str) -> bool:
+    """Returns True if the given username is valid, False otherwise."""
+    if not isinstance(username, str):
+        logging.warning("Invalid input type: username should be a string")
+        return False
+    if any(z_ in username for z_ in constants.FORBIDDEN_USER_NAMES):
+        logging.warning(f"Invalid username: {username} contains forbidden words")
+        return False
+    return True
+
+
+def is_valid_password(password: str) -> bool:
+    """Returns True if the given password is valid, False otherwise."""
+    if not isinstance(password, str):
+        logging.warning("Invalid input type: password should be a string")
+        return False
+    if any(z_ in password for z_ in constants.FORBIDDEN_PASS_NAMES):
+        logging.warning(f"Invalid password: {password} contains forbidden words")
+        return False
+    return True
+
+
+def is_valid_key(key_name: str) -> bool:
+    """Returns True if the given key name is valid, False otherwise."""
+    if not isinstance(key_name, str):
+        logging.warning("Invalid input type: key name should be a string")
+        return False
+    if any(z_ in key_name for z_ in constants.LEGIT_KEY_NAMES):
+        return True
+    else:
+        logging.warning(f"Invalid key name: {key_name} does not match any of the legitimate key names")
+        return False
+
+
+def check_if_valid_secret(single_config_val: str) -> bool:
+    """Returns True if the given config value is a valid secret, False otherwise."""
+    if not isinstance(single_config_val, str):
+        logging.warning("Invalid input type: config value should be a string")
+        return False
+    single_config_val = single_config_val.lower().strip()
+    if any(x_ in single_config_val for x_ in constants.INVALID_SECRET_CONFIG_VALUES):
+        logging.warning(f"Invalid config value: {single_config_val} contains forbidden words")
+        return False
+    elif len(single_config_val) <= 2:
+        logging.warning(f"Invalid config value: {single_config_val} is too short")
+        return False
+    else:
+        return True
 
 def scanUserName(k_ , val_lis ):
     hard_coded_unames = []
@@ -397,7 +410,8 @@ def scanForResourceLimits(path_scrpt):
         parser.getValsFromKey(yaml_di, constants.KIND_KEY_NAME, val_lis) 
         kind_entries =  list( np.unique( val_lis ) )
         if ( constants.POD_KW in kind_entries ):
-            if ( (constants.CONTAINER_KW in key_list) and (constants.LIMITS_KW not in key_list ) and ( (constants.CPU_KW not in key_list)  or (constants.MEMORY_KW not in key_list) ) ):
+            if ( (constants.CONTAINER_KW in key_list) and (constants.LIMITS_KW not in key_list ) and ( (constants.CPU_KW not in key_list)  or 
+(constants.MEMORY_KW not in key_list) ) ):
                 cnt += 1 
                 if( len(temp_ls) > 0 ):
                     all_values = list( parser.getValuesRecursively(yaml_di)  )
@@ -576,7 +590,9 @@ def runScanner(dir2scan):
                 # need the flags to differentiate legitimate HELM and K8S flags 
                 helm_flag             = parser.checkIfValidHelm(yml_)
                 k8s_flag              = parser.checkIfValidK8SYaml(yml_)
-                all_content.append( ( dir2scan, yml_, within_secret_, templ_secret_, valid_taint_secr, valid_taint_privi, http_dict, absentSecuContextDict, defaultNameSpaceDict, absentResourceDict, rollingUpdateDict, absentNetPolicyDic, pid_dic, ipc_dic, dockersock_dic, host_net_dic, cap_sys_dic, host_alias_dic, allow_privi_dic, unconfied_seccomp_dict, cap_module_dic, k8s_flag, helm_flag ) )
+                all_content.append( ( dir2scan, yml_, within_secret_, templ_secret_, valid_taint_secr, valid_taint_privi, http_dict, absentSecuContextDict, 
+defaultNameSpaceDict, absentResourceDict, rollingUpdateDict, absentNetPolicyDic, pid_dic, ipc_dic, dockersock_dic, host_net_dic, cap_sys_dic, host_alias_dic, 
+allow_privi_dic, unconfied_seccomp_dict, cap_module_dic, k8s_flag, helm_flag ) )
                 print(constants.SIMPLE_DASH_CHAR ) 
 
 
@@ -718,7 +734,8 @@ def scanForUnconfinedSeccomp(path_script ):
     return dic  
 
 if __name__ == '__main__':
-    # test_yaml = '/Users/arahman/K8S_REPOS/GITLAB_REPOS/kubernetes-tutorial-series-youtube/kubernetes-configuration-file-explained/nginx-deployment-result.yaml'
+    # test_yaml = 
+'/Users/arahman/K8S_REPOS/GITLAB_REPOS/kubernetes-tutorial-series-youtube/kubernetes-configuration-file-explained/nginx-deployment-result.yaml'
     # scanSingleManifest(test_yaml) 
     # another_yaml = '/Users/arahman/K8S_REPOS/GITLAB_REPOS/stackgres/stackgres-k8s/install/helm/stackgres-operator/values.yaml'
     # another_yaml = '/Users/arahman/K8S_REPOS/GITLAB_REPOS/justin@kubernetes/src/services/minecraft/values.yaml'
